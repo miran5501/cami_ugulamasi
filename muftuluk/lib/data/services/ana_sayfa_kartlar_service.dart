@@ -11,8 +11,11 @@ class AnaSayfaKartlarService {
   ) async {
     try {
       final response = await http.post(
-        Uri.parse(ApiConstants.mekanlar), // örn: /mekan/kartlar
-        headers: {"Content-Type": "application/json"},
+        Uri.parse(ApiConstants.kartlar), // ngrok linkin burda
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true", // 👈 eklenen kısım
+        },
         body: jsonEncode(request.toJson()),
       );
 

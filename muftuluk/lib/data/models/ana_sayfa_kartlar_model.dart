@@ -2,10 +2,10 @@ import 'dart:convert';
 
 class AnaSayfaKartModel {
   final String id; // UUID string
-  final String ad;
-  final String adres;
-  final String kapakFotograf;
-  final String bolgeAd;
+  final String? ad;
+  final String? adres;
+  final String? kapakFotograf;
+  final String? bolgeAd;
   final double enlem;
   final double boylam;
   final double mesafe;
