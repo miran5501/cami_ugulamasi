@@ -31,12 +31,13 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # API çağrıları
   http: ^1.2.2
   shared_preferences: ^2.2.2
   flutter_map: ^8.2.2
   flutter_map_animations: ^0.9.0
   latlong2: ^0.9.0
+  smooth_page_indicator: ^1.2.0+3
+  url_launcher: ^6.3.0
 
   # State management (tema, dil seçimi, kullanıcı bilgisi vs.)
   provider: ^6.1.2

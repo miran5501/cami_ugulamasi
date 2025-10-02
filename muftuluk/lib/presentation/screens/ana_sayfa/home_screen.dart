@@ -3,11 +3,10 @@ import 'package:muftuluk/data/models/ana_sayfa_kartlar_model.dart';
 import 'package:muftuluk/data/models/ana_sayfa_kartlar_request_model.dart';
 import 'package:muftuluk/data/services/ana_sayfa_kartlar_service.dart';
 import 'package:provider/provider.dart';
-
-// 👇 header.dart import
 import './header.dart';
 import 'package:muftuluk/core/providers/language_provider.dart';
 import 'package:muftuluk/core/localization/app_localizations.dart';
+import 'package:muftuluk/presentation/screens/detay/cami_tarihce.dart';
 
 class AnaSayfaScreen extends StatefulWidget {
   const AnaSayfaScreen({super.key});
@@ -43,10 +42,7 @@ class _AnaSayfaScreenState extends State<AnaSayfaScreen> {
       ),
       body: Column(
         children: [
-          // 👇 Header bileşeni
           const AnaSayfaHeader(),
-
-          // Liste builder
           Expanded(
             child: FutureBuilder<List<AnaSayfaKartModel>>(
               future: futureKartlar,
@@ -55,20 +51,32 @@ class _AnaSayfaScreenState extends State<AnaSayfaScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
+                  final errorMsg = snapshot.error.toString().replaceFirst(
+                    "Exception: ",
+                    "",
+                  );
                   return Center(
-                    child: Text(
-                      "${lang.translate("error")}: ${snapshot.error}",
-                      style: theme.textTheme.bodyMedium,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red, size: 40),
+                        const SizedBox(height: 8),
+                        Text(
+                          lang.translate("error"),
+                          style: theme.textTheme.bodyLarge!.copyWith(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(errorMsg, textAlign: TextAlign.center),
+                      ],
                     ),
                   );
                 }
+
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(
-                    child: Text(
-                      lang.translate("no_data"),
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  );
+                  return Center(child: Text(lang.translate("no_data")));
                 }
 
                 final kartlar = snapshot.data!;
@@ -86,78 +94,110 @@ class _AnaSayfaScreenState extends State<AnaSayfaScreen> {
                               : index;
                         });
                       },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 400),
-                        curve: Curves.easeInOut,
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        height: isSelected ? 220 : 100,
-                        decoration: BoxDecoration(
-                          color: theme.cardColor.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: theme.colorScheme.secondary,
-                            width: 1,
-                          ),
-                        ),
-                        child: isSelected
-                            ? Stack(
-                                children: [
-                                  // 📌 Fotoğraf sadece açıkken
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child:
-                                        kart.kapakFotograf != null &&
-                                            kart.kapakFotograf!.isNotEmpty
-                                        ? Image.network(
-                                            kart.kapakFotograf!,
-                                            height: double.infinity,
-                                            width: double.infinity,
-                                            fit: BoxFit.contain,
-                                          )
-                                        : Container(
-                                            color: theme.disabledColor,
-                                            alignment: Alignment.center,
-                                            child: Text(
-                                              lang.translate("no_photo"),
-                                              style: theme.textTheme.bodyMedium!
-                                                  .copyWith(
-                                                    color: theme.disabledColor,
+                      child: Stack(
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeInOut,
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            height: isSelected ? 220 : 100,
+                            decoration: BoxDecoration(
+                              color: theme.cardColor.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: theme.colorScheme.secondary,
+                                width: 1,
+                              ),
+                            ),
+                            child: isSelected
+                                ? Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child:
+                                            kart.kapakFotograf != null &&
+                                                kart.kapakFotograf!.isNotEmpty
+                                            ? Image.network(
+                                                kart.kapakFotograf!,
+                                                height: double.infinity,
+                                                width: double.infinity,
+                                                fit: BoxFit.cover,
+                                              )
+                                            : Container(
+                                                color: theme.disabledColor,
+                                                alignment: Alignment.center,
+                                                child: Text(
+                                                  lang.translate("no_photo"),
+                                                  style: theme
+                                                      .textTheme
+                                                      .bodyMedium!
+                                                      .copyWith(
+                                                        color:
+                                                            theme.disabledColor,
+                                                      ),
+                                                ),
+                                              ),
+                                      ),
+                                      Align(
+                                        alignment: Alignment.bottomLeft,
+                                        child: Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                theme.brightness ==
+                                                    Brightness.dark
+                                                ? Colors.black.withOpacity(0.6)
+                                                : Colors.white.withOpacity(0.6),
+                                            borderRadius:
+                                                const BorderRadius.only(
+                                                  bottomLeft: Radius.circular(
+                                                    16,
                                                   ),
-                                            ),
+                                                  bottomRight: Radius.circular(
+                                                    16,
+                                                  ),
+                                                ),
                                           ),
-                                  ),
-                                  // 📌 Yazılar (fotoğraf üstünde)
-                                  Align(
-                                    alignment: Alignment.bottomLeft,
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            theme.brightness == Brightness.dark
-                                            ? Colors.black.withOpacity(
-                                                0.6,
-                                              ) // dark mod
-                                            : Colors.white.withOpacity(
-                                                0.6,
-                                              ), // light mod
-                                        borderRadius: const BorderRadius.only(
-                                          bottomLeft: Radius.circular(16),
-                                          bottomRight: Radius.circular(16),
+                                          child: _buildCardTexts(
+                                            kart,
+                                            lang,
+                                            theme,
+                                          ),
                                         ),
                                       ),
-                                      child: _buildCardTexts(kart, lang, theme),
-                                    ),
+                                    ],
+                                  )
+                                : Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: _buildCardTexts(kart, lang, theme),
                                   ),
-                                ],
-                              )
-                            : Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: _buildCardTexts(kart, lang, theme),
+                          ),
+
+                          // 📌 Sağ üst köşeye bilgi ikonu
+                          Positioned(
+                            right: 16,
+                            top: 16,
+                            child: IconButton(
+                              icon: Icon(
+                                Icons.info,
+                                color: theme.colorScheme.secondary,
                               ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        TarihceScreen(mekanId: kart.id),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -181,7 +221,6 @@ class _AnaSayfaScreenState extends State<AnaSayfaScreen> {
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 kart.ad ?? lang.translate("unnamed"),

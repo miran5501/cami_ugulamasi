@@ -60,13 +60,43 @@ class _HaritaScreenState extends State<HaritaScreen>
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+
           if (snapshot.hasError) {
-            return Center(child: Text("Hata: ${snapshot.error}"));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("Hiç cami bulunamadı"));
+            final errorMsg = snapshot.error.toString().replaceFirst(
+              "Exception: ",
+              "",
+            );
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red, size: 40),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Hata",
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(errorMsg, textAlign: TextAlign.center),
+                ],
+              ),
+            );
           }
 
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.location_off, color: Colors.grey, size: 40),
+                  const SizedBox(height: 8),
+                  Text("Cami bulunamadı"),
+                ],
+              ),
+            );
+          }
           if (_camiler.isEmpty) {
             _camiler = List.from(snapshot.data!);
           }
