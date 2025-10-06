@@ -1,8 +1,13 @@
 package com.cami_rehberi.api.service.serviceImpl;
 
+import com.cami_rehberi.api.common.exception.BadRequestException;
+import com.cami_rehberi.api.common.exception.NotFoundException;
+import com.cami_rehberi.api.dto.MekanFotoDto;
 import com.cami_rehberi.api.dto.request.MekanEkleRequest;
 import com.cami_rehberi.api.dto.request.MekanKartRequest;
+import com.cami_rehberi.api.dto.response.MekanDetayResponse;
 import com.cami_rehberi.api.dto.response.MekanKartResponse;
+import com.cami_rehberi.api.dto.response.MekanTarihceResponse;
 import com.cami_rehberi.api.entity.*;
 import com.cami_rehberi.api.repository.*;
 import com.cami_rehberi.api.service.IMekanService;
@@ -16,57 +21,66 @@ import java.util.UUID;
 @Service
 public class MekanServiceImpl implements IMekanService {
 
-    @Autowired
-    private MekanRepository mekanRepository;
+    @Autowired private MekanRepository mekanRepository;
+    @Autowired private MekanDetayRepository mekanDetayRepository;
+    @Autowired private BolgeCeviriRepository bolgeCeviriRepository;
+    @Autowired private MekanFotoRepository mekanFotoRepository;
+    @Autowired private BolgeRepository bolgeRepository;
+    @Autowired private MekanTarihceBlokRepository mekanTarihceBlokRepository;
 
-    @Autowired
-    private MekanDetayRepository mekanDetayRepository;
+    // ✅ Ortak dil kodu kontrolü
+    private String resolveDilKodu(String dilKodu) {
+        String aktifDil = (dilKodu == null || dilKodu.isBlank()) ? "tr" : dilKodu.toLowerCase();
 
-    @Autowired
-    private BolgeCeviriRepository bolgeCeviriRepository;
+        // Sadece tr, en, el geçerli
+        if (!aktifDil.equals("tr") && !aktifDil.equals("en") && !aktifDil.equals("el")) {
+            throw new BadRequestException("Geçersiz dil kodu: " + aktifDil + ". Sadece tr, en, el destekleniyor.");
+        }
 
-    @Autowired
-    private MekanFotoRepository mekanFotoRepository;
+        return aktifDil;
+    }
 
-    @Autowired
-    private BolgeRepository bolgeRepository;
+
+    // ✅ Ortak mesafe hesaplama
+    private Double calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
+
+        final int R = 6371; // Dünya yarıçapı km
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat/2) * Math.sin(dLat/2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon/2) * Math.sin(dLon/2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
 
     @Override
     public List<MekanKartResponse> getAllMekanKartResponse(MekanKartRequest request) {
-        // Dil kodu kontrolü (default tr)
-        String dilKodu = (request.getDilKodu() == null || request.getDilKodu().isBlank())
-                ? "tr"
-                : request.getDilKodu();
+        String dilKodu = resolveDilKodu(request.getDilKodu());
 
-        // Mekan listesi
         List<Mekan> mekanList = mekanRepository.findAll();
-
-        // Çeviriler
         List<MekanDetay> mekanDetayList = mekanDetayRepository.findByDilKodu(dilKodu);
         List<BolgeCeviri> bolgeCeviriList = bolgeCeviriRepository.findByDilKodu(dilKodu);
 
-        // Response listesi oluştur
-        List<MekanKartResponse> responseList = mekanList.stream().map(m -> {
-                    // Mekan çevirisi
+        return mekanList.stream()
+                .map(m -> {
                     MekanDetay ceviri = mekanDetayList.stream()
                             .filter(c -> c.getMekan().getId().equals(m.getId()))
                             .findFirst()
                             .orElse(null);
 
-                    // Bölge çevirisi
                     BolgeCeviri bolgeCeviri = bolgeCeviriList.stream()
                             .filter(b -> b.getBolge().getId().equals(m.getBolge().getId()))
                             .findFirst()
                             .orElse(null);
 
-                    // Kapak fotoğrafı
                     String kapakFoto = mekanFotoRepository
                             .findFirstByMekanIdAndIsKapakFotoTrue(m.getId())
                             .map(MekanFoto::getUrl)
                             .orElse(null);
 
-                    // Mesafe hesapla (km)
-                    Double mesafe = distanceInKm(
+                    Double mesafe = calculateDistance(
                             request.getEnlem(),
                             request.getBoylam(),
                             m.getEnlem(),
@@ -75,28 +89,27 @@ public class MekanServiceImpl implements IMekanService {
 
                     return new MekanKartResponse(
                             m.getId(),
-                            ceviri != null ? ceviri.getAd() : null,
+                            ceviri != null ? ceviri.getAd() : m.getDefaultAd(),
                             ceviri != null ? ceviri.getAdres() : null,
                             kapakFoto,
-                            bolgeCeviri != null ? bolgeCeviri.getAd() : null,
+                            bolgeCeviri != null ? bolgeCeviri.getAd() : m.getBolge().getDefaultAd(),
                             m.getEnlem(),
                             m.getBoylam(),
                             mesafe
                     );
-                }).sorted(Comparator.comparing(MekanKartResponse::getMesafe))
+                })
+                .sorted(Comparator.comparing(
+                        MekanKartResponse::getMesafe,
+                        Comparator.nullsLast(Double::compareTo)
+                ))
                 .toList();
-
-        return responseList;
     }
 
     @Override
     public Mekan postMekanEkle(MekanEkleRequest mekanEkleRequest) {
-        // Bolge entity'sini id ile bul
-        UUID bolgeId = mekanEkleRequest.getBolgeId();
-        Bolge bolge = bolgeRepository.findById(bolgeId)
-                .orElseThrow(() -> new RuntimeException("Bölge bulunamadı"));
+        Bolge bolge = bolgeRepository.findById(mekanEkleRequest.getBolgeId())
+                .orElseThrow(() -> new NotFoundException("Bölge bulunamadı"));
 
-        // Mekan oluştur
         Mekan mekan = new Mekan();
         mekan.setTip(mekanEkleRequest.getTip());
         mekan.setBolge(bolge);
@@ -104,7 +117,6 @@ public class MekanServiceImpl implements IMekanService {
         mekan.setBoylam(mekanEkleRequest.getBoylam());
         mekan.setDefaultAd(mekanEkleRequest.getDefaultAd());
 
-        // DB'ye kaydet
         return mekanRepository.save(mekan);
     }
 
@@ -113,16 +125,58 @@ public class MekanServiceImpl implements IMekanService {
         return mekanRepository.findAll();
     }
 
+    @Override
+    public MekanDetayResponse getMekanDetayGetir(MekanKartRequest request, UUID id) {
+        String dilKodu = resolveDilKodu(request.getDilKodu());
 
-    private double distanceInKm(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // Dünya yarıçapı km
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat/2) * Math.sin(dLat/2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon/2) * Math.sin(dLon/2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c; // km cinsinden
+        Mekan mekan = mekanRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Mekan bulunamadı"));
+
+        MekanDetay mekanDetay = mekanDetayRepository.findByMekanAndDilKodu(mekan, dilKodu)
+                .orElseThrow(() -> new NotFoundException("Mekan detay bulunamadı"));
+
+        BolgeCeviri bolgeCeviri = bolgeCeviriRepository.findByBolgeAndDilKodu(mekan.getBolge(), dilKodu)
+                .orElse(null);
+
+        List<MekanFotoDto> fotoList = mekanFotoRepository.findByMekanOrderBySira(mekan)
+                .stream()
+                .map(f -> new MekanFotoDto(f.getUrl(), f.getIsKapakFoto(), f.getSira()))
+                .toList();
+
+        Double mesafe = calculateDistance(
+                request.getEnlem(),
+                request.getBoylam(),
+                mekan.getEnlem(),
+                mekan.getBoylam()
+        );
+
+        return new MekanDetayResponse(
+                mekan.getId(),
+                mekanDetay.getAd(),
+                mekanDetay.getAdres(),
+                bolgeCeviri != null ? bolgeCeviri.getAd() : mekan.getBolge().getDefaultAd(),
+                mekan.getEnlem(),
+                mekan.getBoylam(),
+                mesafe,
+                fotoList
+        );
     }
 
+    @Override
+    public List<MekanTarihceResponse> getMekanDetayTarihce(UUID id, String dilKodu) {
+        String aktifDilKodu = resolveDilKodu(dilKodu);
+
+        Mekan mekan = mekanRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Mekan bulunamadı"));
+
+        return mekanTarihceBlokRepository.findByMekanAndDilKoduOrderBySira(mekan, aktifDilKodu)
+                .stream()
+                .map(b -> new MekanTarihceResponse(
+                        b.getParagraf(),
+                        b.getResimUrl(),
+                        b.getIsBaslik(),
+                        b.getSira()
+                ))
+                .toList();
+    }
 }

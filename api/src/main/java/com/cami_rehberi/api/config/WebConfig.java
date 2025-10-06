@@ -13,10 +13,11 @@ public class WebConfig {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:3000") // React için izin
-                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                        .allowCredentials(true);
+                registry.addMapping("/**") // tüm endpointler
+                        .allowedOrigins("*") // tüm domainlere izin
+                        .allowedMethods("*") // GET, POST, PUT, DELETE, OPTIONS hepsi
+                        .allowedHeaders("*") // tüm headerlara izin
+                        .allowCredentials(false); // "*" ile birlikte true olamaz, false olmalı
             }
         };
     }
